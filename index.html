@@ -646,12 +646,37 @@ function closeModal() {
 }
 
 // ── PDF Generation ──
+function calcPdfHeight(data) {
+  // Pre-calculate total height needed
+  let y = 28; // after header bar (22mm) + gap
+  y += 12;    // receipt number box
+  y += 5;     // fecha
+  y += 5;     // cliente
+  if (data.cuit) y += 5;
+  y += 5;     // medio de pago
+  if (data.notes) {
+    const noteLines = Math.ceil(data.notes.length / 50) || 1;
+    y += 2 + noteLines * 3.5 + 2;
+  }
+  y += 7; // line + gap
+  data.items.forEach(item => {
+    const textLen = (item.desc + ' × ' + item.qty).length;
+    const lines = Math.ceil(textLen / 35) || 1;
+    y += lines * 4 + 2;
+  });
+  y += 8;  // line + gap
+  y += 10; // total
+  y += 10; // footer + bottom margin
+  return Math.max(y + 10, 80); // minimum 80mm
+}
+
 function downloadPDF() {
   const data = window._pendingReceipt;
   if (!data) return;
 
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: [80, 200] });
+  const pageH = calcPdfHeight(data);
+  const doc = new jsPDF({ unit: 'mm', format: [80, pageH] });
 
   const [cr, cg, cb] = data.companyColor;
   let y = 10;
@@ -734,9 +759,6 @@ function downloadPDF() {
   doc.setFontSize(5);
   doc.setTextColor(160, 160, 160);
   doc.text('Recibo no fiscal — Comprobante de pago', 40, y, { align: 'center' });
-
-  // Trim page height
-  doc.internal.pageSize.height = y + 10;
 
   // Save
   const filename = `Recibo_${data.receiptNum}_${data.client.replace(/\s+/g, '_')}.pdf`;
